@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>استقبال الصور</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  background: #edf2f7;
+  color: #1e293b;
+}
+main {
+  max-width: 440px;
+  margin: 40px auto;
+  padding: 25px;
+  background: white;
+  border-radius: 18px;
+  text-align: center;
+  box-shadow: 0 5px 20px #0001;
+}
+h2 { color: #087f5b; }
+input, button {
+  width: 100%;
+  padding: 14px;
+  margin-top: 16px;
+  border-radius: 9px;
+  font-size: 16px;
+}
+input { border: 1px solid #ccd5df; }
+button {
+  background: #087f5b;
+  color: white;
+  border: none;
+  font-weight: bold;
+}
+button:disabled { opacity: .6; }
+#status { overflow-wrap: anywhere; }
+.small { color: #64748b; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h2>📸 أرسل صورك</h2>
+  <p>اختر صورة أو عدة صور لإرسالها.</p>
+
+  <input id="files" type="file"
+    accept="image/jpeg,image/png,image/webp,image/gif"
+    multiple>
+
+  <button id="upload">إرسال الصور</button>
+  <p id="status" role="status"></p>
+  <p class="small">الصور تُرفع إلى مساحة تخزين الموقع.</p>
+</main>
+
+<script type="module">
+import { createClient } from
+  'https://esm.sh/@supabase/supabase-js@2';
+
+// ضع بيانات مشروعك هنا:
+const PROJECT_URL = 'YOUR_PROJECT_URL';
+const PUBLIC_KEY = 'YOUR_PUBLISHABLE_KEY';
+
+const supabase = createClient(PROJECT_URL, PUBLIC_KEY);
+
+const input = document.getElementById('files');
+const button = document.getElementById('upload');
+const status = document.getElementById('status');
+
+button.addEventListener('click', async () => {
+  const files = Array.from(input.files || []);
+
+  if (!files.length) {
+    status.textContent = 'اختر الصور أولاً.';
+    return;
+  }
+
+  if (PROJECT_URL.startsWith('YOUR_') ||
+      PUBLIC_KEY.startsWith('YOUR_')) {
+    status.textContent = 'أضف بيانات Supabase أولاً.';
+    return;
+  }
+
+  if (files.length > 10) {
+    status.textContent = 'اختر 10 صور كحد أقصى في المرة.';
+    return;
+  }
+
+  for (const file of files) {
+    if (!['image/jpeg', 'image/png',
+          'image/webp', 'image/gif'].includes(file.type)) {
+      status.textContent = 'هناك ملف ليس من أنواع الصور المسموحة.';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      status.textContent = 'حجم كل صورة يجب ألا يتجاوز 5 ميغابايت.';
+      return;
+    }
+  }
+
+  button.disabled = true;
+  let success = 0;
+
+  try {
+    for (const file of files) {
+      status.textContent =
+        `جارٍ رفع الصور: ${success} من ${files.length}`;
+
+      const ext = ({
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+        'image/gif': 'gif'
+      })[file.type];
+
+      const path = `${crypto.randomUUID()}.${ext}`;
+
+      const { error } = await supabase.storage
+        .from('photos')
+        .upload(path, file, {
+          contentType: file.type,
+          upsert: false
+        });
+
+      if (error) throw error;
+      success++;
+    }
+
+    status.textContent = `تم رفع ${success} صورة بنجاح ✅`;
+    input.value = '';
+  } catch (error) {
+    status.textContent =
+      `تعذر رفع الصور: ${error.message}`;
+  } finally {
+    button.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
